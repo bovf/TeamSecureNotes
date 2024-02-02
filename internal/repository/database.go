@@ -1,12 +1,15 @@
 package repository
 
 import (
+
 	"context"
 	"fmt"
 	"log"
 	"time"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"teams-secure-notes/internal/model"
 )
 
 var DB *mongo.Database
@@ -38,3 +41,38 @@ func InitializeDB(user, password, host, port, dbName string) {
 	log.Println("Successfully connected to MongoDB")
 }
 
+// CreateUser inserts a new user into the database
+func CreateUser(user *model.User) error {
+	collection := DB.Collection("users")
+	log.Println(user)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := collection.InsertOne(ctx, user)
+	if err != nil {
+		log.Printf("Could not insert user: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// GetUserByUsername finds a user by their username
+func GetUserByUsername(username string) (*model.User, error) {
+	collection := DB.Collection("users")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user model.User
+	err := collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil // No user found, return nil without an error
+		}
+		log.Printf("Could not find user: %v", err)
+		return nil, err
+	}
+	return &user, nil
+}
